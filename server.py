@@ -1,15 +1,32 @@
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import uuid
+import os
+
+STUDENTS_FILE = 'students.json'
+SETTINGS_FILE = 'settings.json'
+
+def load_data(filepath, default_value):
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return default_value
+
+def save_data(filepath, data):
+    with open(filepath, 'w') as f:
+        json.dump(data, f)
 
 # In-memory database
-students = []
+students = load_data(STUDENTS_FILE, [])
 campus_location = None
-class_settings = {
+class_settings = load_data(SETTINGS_FILE, {
     "subject": "Anatomy 101",
     "professor": "Dr. Suresh",
     "time": "10:00 AM - 11:00 AM"
-}
+})
 
 class SimpleRESTHandler(BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -50,6 +67,7 @@ class SimpleRESTHandler(BaseHTTPRequestHandler):
                 new_student['id'] = str(uuid.uuid4())
                 
             students.append(new_student)
+            save_data(STUDENTS_FILE, students)
             self._set_headers()
             self.wfile.write(json.dumps(new_student).encode())
             
@@ -64,7 +82,8 @@ class SimpleRESTHandler(BaseHTTPRequestHandler):
                     s['isPresent'] = True
                     s['checkInTime'] = checkin_data.get('time', 'Unknown')
                     break
-                    
+            
+            save_data(STUDENTS_FILE, students)
             self._set_headers()
             self.wfile.write(json.dumps({'status': 'success'}).encode())
             
@@ -86,11 +105,14 @@ class SimpleRESTHandler(BaseHTTPRequestHandler):
                 student['isPresent'] = False
                 student['checkInTime'] = None
                 
+            save_data(STUDENTS_FILE, students)
+            save_data(SETTINGS_FILE, class_settings)
             self._set_headers()
             self.wfile.write(json.dumps({'status': 'success'}).encode())
             
         elif self.path == '/api/settings/clear':
             students.clear()
+            save_data(STUDENTS_FILE, students)
             print("Database completely cleared!")
             self._set_headers()
             self.wfile.write(json.dumps({'status': 'success'}).encode())
